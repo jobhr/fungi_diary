@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Growth / Decay</title>
+<style>
+*{box-sizing:border-box}
+*{cursor:url(cursor.png) 14 0,auto!important;cursor:-webkit-image-set(url(cursor.png) 1x,url(cursor@2x.png) 2x) 14 0,auto!important;cursor:image-set(url(cursor.png) 1x,url(cursor@2x.png) 2x) 14 0,auto!important;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+*:active{cursor:url(cursor-down.png) 22 4,auto!important;cursor:-webkit-image-set(url(cursor-down.png) 1x,url(cursor-down@2x.png) 2x) 22 4,auto!important;cursor:image-set(url(cursor-down.png) 1x,url(cursor-down@2x.png) 2x) 22 4,auto!important}
+img{-webkit-user-drag:none;user-drag:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}#bgG{display:none}}
+:root{--f:"Ping L","Ping LCG","PingFang SC","PingFang TC","Helvetica Neue",Helvetica,Arial,sans-serif}
+html,body{margin:0;height:100%;overflow:hidden;font:12px/1.5 var(--f);color:#222;background:#e8c9c4}
+#vp{position:fixed;inset:0;touch-action:none}
+/* Two complete scenes on top of each other: Original (pink) below and Dither (grey) above.
+   The white line cuts the Dither scene open from its position to the right edge. */
+.scene{position:absolute;inset:0;overflow:hidden}
+#sD{clip-path:inset(0 0 0 var(--sx,50vw))}
+/* backgrounds are tiled endlessly and follow pan and zoom, so they are visible everywhere */
+.bg{position:absolute;inset:0;pointer-events:none;background-repeat:repeat;background-size:var(--bs,1500px 2121px);background-position:var(--bp,0 0)}
+#bgA{background-image:url(bg.webp);background-color:#e8c9c4}
+#bgB{background-image:url(bg-dither.webp);background-color:#cfcfcf}
+/* Dither scene only: a copy of the grey background flashes thin shifted bands (glitch) and a fine film grain lies on top */
+#bgG{background-image:url(bg-dither.webp);filter:contrast(1.35);animation:glitch 7s steps(1) infinite}
+@keyframes glitch{0%,38%{clip-path:inset(0 0 100% 0);transform:none}
+39%{clip-path:inset(18% 0 74% 0);transform:translateX(-16px)}39.6%{clip-path:inset(57% 0 36% 0);transform:translateX(20px)}40.2%{clip-path:inset(33% 0 61% 0);transform:translateX(-9px)}
+41%,86%{clip-path:inset(0 0 100% 0);transform:none}
+87%{clip-path:inset(71% 0 22% 0);transform:translateX(14px)}87.7%{clip-path:inset(8% 0 87% 0);transform:translateX(-22px)}88.4%,100%{clip-path:inset(0 0 100% 0);transform:none}}
+#noise{position:absolute;inset:0;pointer-events:none;background:url(noise.png) 0 0/128px 128px;mix-blend-mode:multiply;opacity:.65;animation:grain .5s steps(1) infinite}
+@keyframes grain{0%{background-position:0 0}20%{background-position:-37px 53px}40%{background-position:71px -29px}60%{background-position:-83px -61px}80%{background-position:29px 97px}}
+.board{position:absolute;left:0;top:0;width:3000px;height:4244px;transform-origin:0 0}
+.it{position:absolute;transform-origin:50% 70%;animation:float 7s ease-in-out infinite;animation-delay:var(--d,0s)}
+.it img{display:block;width:100%;image-rendering:auto;box-shadow:0 2px 14px #0004;transition:transform .55s cubic-bezier(.34,1.56,.64,1),filter .4s,box-shadow .4s}
+#sD .it img{image-rendering:pixelated}
+.it:hover img{transform:scale(1.05) rotate(-1.5deg);filter:saturate(1.35) contrast(1.06);box-shadow:0 10px 30px #0006}
+@keyframes float{0%,100%{transform:translateY(0) rotate(calc(var(--r,0deg) - .8deg))}50%{transform:translateY(-9px) rotate(calc(var(--r,0deg) + .8deg))}}
+/* vertical labels: DAY on the left reads top to bottom, PIXEL on the right reads bottom to top */
+.side{--c:#e1141c;position:absolute;pointer-events:none;writing-mode:vertical-rl;white-space:nowrap;font-family:"Neue Haas Unica","Neue Haas Unica Pro","NeueHaasUnica-Medium","Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:500;text-transform:uppercase;font-size:38px;line-height:1;letter-spacing:.2em;color:var(--c);opacity:.78;transition:letter-spacing .5s cubic-bezier(.34,1.56,.64,1)}
+.side b{display:inline-block;font-weight:500;font-size:1.9em;letter-spacing:.05em;color:transparent;-webkit-text-stroke:1.6px var(--c)}
+.side.l{right:100%;margin-right:18px;top:0;transform:rotate(-2deg)}
+.side.r{left:100%;margin-left:18px;bottom:0;transform:rotate(178deg)}
+.it:hover .side{letter-spacing:.34em}
+#sO .side{--c:#fff;opacity:.92;text-shadow:0 0 8px rgba(0,0,0,.25)}
+#sO .side b{color:#fff}
+/* the white line */
+#split{position:absolute;top:0;bottom:0;left:50%;width:28px;margin-left:-14px;touch-action:none;z-index:2}
+#split::before{content:"";position:absolute;top:0;bottom:0;left:13px;width:2px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.35)}
+/* the plus is just two thin white lines */
+#plus{position:fixed;right:18px;bottom:18px;z-index:5;width:30px;height:30px;border:0;background:none;padding:0;font-size:0;filter:drop-shadow(0 0 3px rgba(0,0,0,.4));transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+#plus::before,#plus::after{content:"";position:absolute;left:50%;top:50%;background:#fff}
+#plus::before{width:18px;height:1.5px;margin:-.75px 0 0 -9px}
+#plus::after{width:1.5px;height:18px;margin:-9px 0 0 -.75px}
+#plus:hover{transform:scale(1.25) rotate(90deg)}
+#add{position:fixed;inset:0;z-index:8;background:#0006;display:flex;align-items:center;justify-content:center;animation:fade .25s ease-out}
+#add[hidden]{display:none}
+#add .box{background:#fff;border-radius:16px;padding:18px 20px;min-width:310px;box-shadow:0 8px 30px #0005;font-size:13px}
+#add b{font:600 16px var(--f);display:block;margin-bottom:12px}
+#add .row{display:flex;align-items:center;gap:10px;margin:8px 0}
+#add .row span{width:58px}
+#add em{font-style:normal;color:#888;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#add button{font:inherit;border:1px solid #222;background:#fff;padding:3px 10px}
+#add button:disabled{opacity:.35}
+#add .act{display:flex;gap:8px;margin-top:14px}
+#hud{position:fixed;left:12px;top:12px;z-index:5;background:#fffe;padding:12px 14px;max-width:300px;border-radius:12px}
+#hud h1{font-size:14px;margin:0 0 6px}
+#hud p{margin:0 0 8px}
+#hud .n{font-size:15px;font-weight:700}
+#hud .n,#sv{color:#e1141c}
+#hud button{font:inherit;border:1px solid #222;background:#fff;padding:3px 10px;transition:transform .35s cubic-bezier(.34,1.56,.64,1),background .25s,color .25s}
+#hud button:hover{transform:scale(1.08) rotate(-2deg)}
+#hud button.on{background:#222;color:#fff}
+#ov{position:fixed;inset:0;z-index:9;background:#000b;display:flex;align-items:center;justify-content:center}
+#ov[hidden]{display:none}
+#ov{animation:fade .3s ease-out}
+#cmp{animation:rise .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{transform:scale(.88) rotate(-1.5deg);opacity:0}}
+#x{position:absolute;right:14px;top:10px;font:22px var(--f);background:none;border:0;color:#fff}
+#cmp{position:relative;touch-action:none;line-height:0}
+#cmp>img#a{width:min(92vw,88vh);height:auto}
+#cmp>img{max-width:92vw;max-height:88vh;display:block;user-select:none;-webkit-user-drag:none}
+#cmp>img#b{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;clip-path:inset(0 0 0 50%)}
+#h{position:absolute;top:0;bottom:0;left:50%;width:16px;transform:translateX(-8px);background:linear-gradient(90deg,transparent,rgba(0,0,0,.22) 36%,#161616 45%,#161616 53%,#dcdcdc 57%,rgba(0,0,0,.16) 66%,transparent)}
+/* file size card: outside the image, draggable, 20% smaller (scale .8) */
+#card{position:fixed;left:20px;top:20px;width:250px;background:#fff;border-radius:16px;padding:16px 18px;line-height:1.4;box-shadow:0 6px 24px #0004;opacity:0;pointer-events:none;transition:opacity .2s;font-size:13px;transform:scale(.8);transform-origin:0 0;touch-action:none;user-select:none;z-index:2}
+#card.show{opacity:1;pointer-events:auto}
+#card.pop{animation:pop .3s}
+@keyframes pop{0%{transform:scale(.6)}70%{transform:scale(.86)}100%{transform:scale(.8)}}
+#card b{font:600 16px var(--f)}
+#card .r{display:flex;align-items:center;gap:14px;margin:8px 0}
+#card big{display:block;font:700 28px var(--f)}
+#card small{color:#aaa;font:14px var(--f)}
+#card .l{display:flex;justify-content:space-between;font:15px var(--f);margin-top:2px}
+.pf{position:absolute;width:46px;height:46px;margin:-23px;border-radius:50%;background:#fff;filter:blur(4px);pointer-events:none;animation:pf .6s ease-out forwards;z-index:3}
+@keyframes pf{from{transform:translate(0,0) scale(.3);opacity:.95}to{transform:translate(var(--dx),var(--dy)) scale(1.6);opacity:0}}
+</style></head><body>
+<div id="vp">
+ <div class="scene" id="sO"><div class="bg" id="bgA"></div><div class="board" id="bO"></div></div>
+ <div class="scene" id="sD"><div class="bg" id="bgB"></div><div class="bg" id="bgG"></div><div id="noise"></div><div class="board" id="bD"></div></div>
+ <div id="split"></div>
+</div>
+<div id="hud">
+<h1>Growth / Decay</h1>
+<p>A mushroom grows, the image gets coarser. One photo a day, larger pixels each day. More fungus, less image, less data.</p>
+<p>Currently loaded: <span class="n"><span id="kb">0</span> KB</span><br><span id="sv"></span></p>
+<button id="mo">Original</button> <button id="md">Dither</button>
+</div>
+<button id="plus" title="Add the next day" aria-label="Add the next day"></button>
+<div id="add" hidden><div class="box"><b id="addT">Add day</b>
+ <div class="row"><span>Original</span><button id="pO">Choose file</button><em id="nO"></em></div>
+ <div class="row"><span>Dither</span><button id="pD">Choose file</button><em id="nD"></em></div>
+ <div class="act"><button id="ok" disabled>Add</button><button id="cn">Cancel</button></div>
+ <input type="file" id="fO" accept="image/*" hidden><input type="file" id="fD" accept="image/*" hidden></div></div>
+<div id="ov" hidden><button id="x">✕</button>
+<div id="cmp"><img id="a" alt=""><img id="b" alt=""><div id="h"></div></div>
+<div id="card"></div></div>
+<script>
+// ===== EDIT HERE =====
+// One entry per day. kb = file size in KB (right click file > Info).
+// x / y = start position on the board (3000 x 4244 px). You can also drag the images in the browser.
+const entries=[
+ {day:1,pixelSize:1,kbOriginal:518.7,kbDither:49.9,original:'day1-original.jpg',dithered:'day1-dither.png',x:760,y:700,rot:-4},
+ {day:2,pixelSize:2,kbOriginal:133.7,kbDither:13.6,original:'day2-original.jpg',dithered:'day2-dither.png',x:1880,y:1250,rot:3},
+ {day:3,pixelSize:3,kbOriginal:35.2,kbDither:4.6,original:'day3-original.jpg',dithered:'day3-dither.png',x:1020,y:2080,rot:-2},
+ {day:4,pixelSize:4,kbOriginal:134.1,kbDither:2.4,original:'day4-original.jpg',dithered:'day4-dither.png',x:2100,y:2620,rot:5},
+ {day:5,pixelSize:5,kbOriginal:164.3,kbDither:1.5,original:'day5-original.jpg',dithered:'day5-dither.png',x:640,y:3150,rot:-3.5},
+ // more days: copy a line, change numbers, file names and x / y (rot = tilt in degrees)
+];
+const W=500; // image width on the board (matches the 500 px dither files 1:1)
+// =====================
+const $=id=>document.getElementById(id);
+['dragstart','selectstart'].forEach(t=>addEventListener(t,e=>e.preventDefault()));
+const vp=$('vp'),boards=[$('bO'),$('bD')],card=$('card'),cmp=$('cmp'),ov=$('ov');
+let s=1,tx=0,ty=0,moved=0,hideT,sf=.5; // sf = position of the white line (0 = left edge, 1 = right edge)
+const TW=1500,TH=2121; // background tile (px at zoom 1)
+// dragged positions are remembered in the browser (localStorage) if available
+let saved={};try{saved=JSON.parse(localStorage.getItem('gd-pos2')||'{}')}catch(_){}
+entries.forEach(e=>{if(saved[e.day]){e.x=saved[e.day][0];e.y=saved[e.day][1]}});
+const savePos=()=>{try{const o={};entries.forEach(e=>o[e.day]=[Math.round(e.x),Math.round(e.y)]);localStorage.setItem('gd-pos2',JSON.stringify(o))}catch(_){}};
+
+// the counter follows the line: photos right of it count with their dither size, photos left of it with their original size
+function updateKB(){const X=sf*innerWidth;let t=0,o=0;
+ entries.forEach(e=>{o+=e.kbOriginal;t+=(tx+(e.x+W/2)*s>X)?e.kbDither:e.kbOriginal});
+ $('kb').textContent=t.toFixed(1);$('sv').textContent='saved: '+((1-t/o)*100).toFixed(1)+' %'}
+function setSplit(f){sf=Math.max(0,Math.min(1,f));const x=sf*innerWidth;
+ vp.style.setProperty('--sx',x+'px');$('split').style.left=x+'px';
+ $('mo').className=sf>.995?'on':'';$('md').className=sf<.005?'on':'';updateKB()}
+let anim=0;
+function glide(to){cancelAnimationFrame(anim);(function st(){const d=to-sf;if(Math.abs(d)<.002){setSplit(to);return}setSplit(sf+d*.12);anim=requestAnimationFrame(st)})()}
+$('mo').onclick=()=>glide(1);$('md').onclick=()=>glide(0);
+const sp=$('split');let sd=false;
+sp.addEventListener('pointerdown',e=>{e.stopPropagation();cancelAnimationFrame(anim);sd=true;sp.setPointerCapture(e.pointerId);setSplit(e.clientX/innerWidth)});
+sp.addEventListener('pointermove',e=>{if(sd)setSplit(e.clientX/innerWidth)});
+['pointerup','pointercancel'].forEach(t=>sp.addEventListener(t,()=>sd=false));
+addEventListener('resize',()=>setSplit(sf));
+
+function ap(){const bw=3000*s,bh=4244*s; // keep part of the board in view
+ tx=Math.min(innerWidth-200,Math.max(200-bw,tx));ty=Math.min(innerHeight-200,Math.max(200-bh,ty));
+ boards.forEach(b=>b.style.transform=`translate(${tx}px,${ty}px) scale(${s})`);
+ vp.style.setProperty('--bs',`${TW*s}px ${TH*s}px`);vp.style.setProperty('--bp',`${tx}px ${ty}px`);updateKB()}
+function zoomAt(f,cx,cy){const n=Math.min(4,Math.max(.15,s*f));f=n/s;tx=cx-(cx-tx)*f;ty=cy-(cy-ty)*f;s=n;ap()}
+// smooth motion: eased zoom and gliding pan
+let ts=1,ax=0,ay=0,vx=0,vy=0,raf=0;
+function tick(){let go=false;
+ if(Math.abs(ts-s)>.0004){zoomAt((s+(ts-s)*.18)/s,ax,ay);go=true}
+ if(!P.size&&(Math.abs(vx)>.15||Math.abs(vy)>.15)){tx+=vx;ty+=vy;vx*=.92;vy*=.92;ap();go=true}
+ raf=go?requestAnimationFrame(tick):0}
+const kick=()=>{if(!raf)raf=requestAnimationFrame(tick)};
+vp.addEventListener('wheel',e=>{e.preventDefault();ts=Math.min(4,Math.max(.15,ts*Math.exp(-e.deltaY*.0015)));ax=e.clientX;ay=e.clientY;kick()},{passive:false});
+const P=new Map();let last=0,dragIt=null,zTop=10;
+const dist=()=>{const[a,b]=[...P.values()];return Math.hypot(a.x-b.x,a.y-b.y)};
+vp.addEventListener('pointerdown',e=>{
+ if(dragIt)return;
+ const it=e.target.closest('.it'); // pressing an image drags it (a click without moving opens the slider)
+ if(it&&!P.size){const i=+it.dataset.i;dragIt={els:[...document.querySelectorAll('.it[data-i="'+i+'"]')],en:entries[i],x:e.clientX,y:e.clientY,id:e.pointerId};
+  moved=0;vx=vy=0;dragIt.els.forEach(el=>el.style.zIndex=++zTop);return}
+ P.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=0;vx=vy=0;if(P.size==2)last=dist()});
+addEventListener('pointermove',e=>{
+ if(dragIt&&e.pointerId===dragIt.id){const sx=e.clientX-dragIt.x,sy=e.clientY-dragIt.y;dragIt.x=e.clientX;dragIt.y=e.clientY;moved+=Math.abs(sx)+Math.abs(sy);
+  const en=dragIt.en;en.x=Math.max(0,Math.min(3000-W,en.x+sx/s));en.y=Math.max(0,Math.min(4244-W,en.y+sy/s));
+  dragIt.els.forEach(el=>{el.style.left=en.x+'px';el.style.top=en.y+'px'});updateKB();return}
+ const p=P.get(e.pointerId);if(!p)return;
+ const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+ if(P.size==1){tx+=dx;ty+=dy;vx=vx*.4+dx*.6;vy=vy*.4+dy*.6;moved+=Math.abs(dx)+Math.abs(dy);ap()}
+ else if(P.size==2){const d=dist(),[a,b]=[...P.values()];zoomAt(d/last,(a.x+b.x)/2,(a.y+b.y)/2);ts=s;last=d;moved=99}});
+['pointerup','pointercancel'].forEach(t=>addEventListener(t,e=>{
+ if(dragIt&&e.pointerId===dragIt.id){const d=dragIt;dragIt=null;if(e.type=='pointerup'){if(moved<6)openOv(d.en);else savePos()}return}
+ P.delete(e.pointerId);if(!P.size){if(moved<6)vx=vy=0;kick()}}));
+
+// both scenes get the same photos: original on the left side of the line, dither on the right side
+function render(){boards.forEach(b=>b.innerHTML='');
+ entries.forEach((e,i)=>{[[boards[0],e.original],[boards[1],e.dithered]].forEach(([b,src])=>{
+  const d=document.createElement('div');d.className='it';d.dataset.i=i;
+  d.style.cssText=`left:${e.x}px;top:${e.y}px;width:${W}px;--d:${-(i*1.7)}s;--r:${e.rot||0}deg`;
+  d.innerHTML=`<img src="${src}" alt=""><span class="side l">DAY <b>${e.day}</b></span><span class="side r">PIXEL <b>${e.pixelSize}</b></span>`;
+  b.append(d)})});
+ updateKB()}
+
+function puff(n,big){const r=card.getBoundingClientRect();
+ for(let i=0;i<n;i++){const d=document.createElement('div'),a=Math.random()*6.28,k=(big?60:35)+Math.random()*40;
+  d.className='pf';d.style.left=(r.left+r.width/2+(Math.random()-.5)*r.width*.8)+'px';
+  d.style.top=(r.top+r.height/2+(Math.random()-.5)*r.height*.8)+'px';
+  d.style.setProperty('--dx',Math.cos(a)*k+'px');d.style.setProperty('--dy',Math.sin(a)*k+'px');
+  ov.append(d);setTimeout(()=>d.remove(),650)}}
+function showCard(){clearTimeout(hideT);if(card.classList.contains('show'))return;
+ card.classList.add('show');card.classList.remove('pop');void card.offsetWidth;card.classList.add('pop');puff(6,true)}
+const hideCard=()=>card.classList.remove('show');
+const leave=ms=>{clearTimeout(hideT);hideT=setTimeout(hideCard,ms||400)};
+
+function openOv(e){const p=(e.kbOriginal-e.kbDither)/e.kbOriginal*100,sv=(e.kbOriginal-e.kbDither).toFixed(1);
+ $('a').src=e.original;$('b').src=e.dithered;setPos(50);
+ card.innerHTML=`<b>File Size</b><div class="r"><svg viewBox="0 0 84 84" width="84" height="84"><circle cx="42" cy="42" r="34" fill="none" stroke="#e5e7eb" stroke-width="9"/><circle cx="42" cy="42" r="34" fill="none" stroke="#b83a32" stroke-width="9" stroke-dasharray="${(p*2.136).toFixed(1)} 214" transform="rotate(-90 42 42)"/></svg><div><big>${p.toFixed(1)}%</big><small>${sv} KB saved</small></div></div><div class="l"><span>Original</span><span>${e.kbOriginal.toFixed(1)} KB</span></div><div class="l"><span>Dithered</span><span style="color:#b83a32">${e.kbDither.toFixed(1)} KB</span></div>`;
+ ov.hidden=false;
+ card.style.left='20px';card.style.top=(innerHeight-20-card.offsetHeight*.8)+'px'; // bottom left, outside the image
+ showCard()}
+const closeOv=()=>{ov.hidden=true;clearTimeout(hideT);hideCard();$('a').src=''};
+$('x').onclick=closeOv;addEventListener('keydown',e=>{if(e.key=='Escape'){closeOv();$('add').hidden=true}});
+
+function setPos(p){p=Math.max(0,Math.min(100,p));$('b').style.clipPath=`inset(0 0 0 ${p}%)`;$('h').style.left=p+'%'}
+let drag=false,lastPuff=0;
+const posFrom=e=>{const r=cmp.getBoundingClientRect();setPos((e.clientX-r.left)/r.width*100);
+ if(Date.now()-lastPuff>350){lastPuff=Date.now();puff(3,false)}};
+cmp.addEventListener('pointerdown',e=>{drag=true;cmp.setPointerCapture(e.pointerId);posFrom(e);
+ if(e.pointerType!='mouse')showCard()});
+cmp.addEventListener('pointermove',e=>{if(drag)posFrom(e)});
+cmp.addEventListener('pointerup',e=>{drag=false;if(e.pointerType!='mouse')leave(1500)});
+cmp.addEventListener('mouseenter',showCard);cmp.addEventListener('mouseleave',()=>leave());
+card.addEventListener('mouseenter',()=>clearTimeout(hideT));card.addEventListener('mouseleave',()=>leave());
+// drag the card
+let cd=null;
+card.addEventListener('pointerdown',e=>{const r=card.getBoundingClientRect();cd={x:e.clientX-r.left,y:e.clientY-r.top};
+ card.setPointerCapture(e.pointerId);clearTimeout(hideT)});
+card.addEventListener('pointermove',e=>{if(!cd)return;
+ card.style.left=Math.max(0,Math.min(innerWidth-60,e.clientX-cd.x))+'px';
+ card.style.top=Math.max(0,Math.min(innerHeight-40,e.clientY-cd.y))+'px'});
+card.addEventListener('pointerup',e=>{cd=null;
+ const t=document.elementFromPoint(e.clientX,e.clientY);
+ if(t&&t.closest('#card,#cmp'))clearTimeout(hideT);else leave(e.pointerType=='mouse'?400:1500)});
+
+// ===== plus button: add the next day as a new pair (original + dither) =====
+let fo=null,fd=null;
+const nextDay=()=>Math.max(...entries.map(e=>e.day))+1;
+const idb=()=>new Promise((res,rej)=>{try{const r=indexedDB.open('gd-pairs',1);r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'day'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(err){rej(err)}});
+const idbPut=rec=>idb().then(db=>new Promise((res,rej)=>{const t=db.transaction('p','readwrite');t.objectStore('p').put(rec);t.oncomplete=res;t.onerror=()=>rej(t.error)})).catch(()=>{});
+const idbAll=()=>idb().then(db=>new Promise((res,rej)=>{const q=db.transaction('p').objectStore('p').getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})).catch(()=>[]);
+function openAdd(){fo=fd=null;$('nO').textContent=$('nD').textContent='';$('ok').disabled=true;$('fO').value=$('fD').value='';
+ $('addT').textContent='Add day '+nextDay();$('add').hidden=false}
+$('plus').onclick=openAdd;$('cn').onclick=()=>{$('add').hidden=true};
+$('pO').onclick=()=>$('fO').click();$('pD').onclick=()=>$('fD').click();
+$('fO').onchange=e=>{fo=e.target.files[0]||null;$('nO').textContent=fo?fo.name:'';$('ok').disabled=!(fo&&fd)};
+$('fD').onchange=e=>{fd=e.target.files[0]||null;$('nD').textContent=fd?fd.name:'';$('ok').disabled=!(fo&&fd)};
+$('ok').onclick=()=>{if(!(fo&&fd))return;const day=nextDay();
+ // place it near the middle of the current view with some distance to the other photos
+ const cx=(innerWidth/2-tx)/s-W/2,cy=(innerHeight/2-ty)/s-W/2,R=Math.min(700,innerWidth*.3/s);let x=cx,y=cy;
+ for(let k=0;k<60;k++){const px=Math.max(0,Math.min(3000-W,cx+(Math.random()-.5)*2*R)),py=Math.max(0,Math.min(4244-W,cy+(Math.random()-.5)*2*R));
+  x=px;y=py;if(entries.every(e=>Math.abs(e.x-px)>W+80||Math.abs(e.y-py)>W+80))break}
+ const rot=+(Math.random()*10-5).toFixed(1);
+ const e={day,pixelSize:day,kbOriginal:+(fo.size/1024).toFixed(1),kbDither:+(fd.size/1024).toFixed(1),original:URL.createObjectURL(fo),dithered:URL.createObjectURL(fd),x:Math.round(x),y:Math.round(y),rot};
+ entries.push(e);render();savePos();
+ idbPut({day,pixelSize:day,kbO:e.kbOriginal,kbD:e.kbDither,original:fo,dithered:fd,x:e.x,y:e.y,rot});
+ $('add').hidden=true};
+idbAll().then(rs=>{if(!rs.length)return;
+ rs.sort((a,b)=>a.day-b.day).forEach(r=>{if(entries.some(e=>e.day===r.day))return;const p=saved[r.day];
+  entries.push({day:r.day,pixelSize:r.pixelSize,kbOriginal:r.kbO,kbDither:r.kbD,original:URL.createObjectURL(r.original),dithered:URL.createObjectURL(r.dithered),x:p?p[0]:r.x,y:p?p[1]:r.y,rot:r.rot})});
+ render()});
+
+render();setSplit(.5);
+// start view: all photos in sight
+(()=>{const xs=entries.map(e=>e.x),ys=entries.map(e=>e.y),x0=Math.min(...xs),x1=Math.max(...xs)+W,y0=Math.min(...ys),y1=Math.max(...ys)+W*1.1;
+ s=Math.min(1.2,innerWidth*.8/(x1-x0),innerHeight*.8/(y1-y0));ts=s;
+ tx=innerWidth/2-s*(x0+x1)/2;ty=innerHeight/2-s*(y0+y1)/2;ap()})();
+</script></body></html>
